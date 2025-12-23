@@ -74,6 +74,7 @@
 #       {{ 'registered/kept' if instance_state in ['running','stopped'] else 'removed' }}
 #       in target group {{ target_group_name }}
 
+
 ---
 # Validate inputs
 - name: Validate required inputs
@@ -81,67 +82,80 @@
     that:
       - instance_ip | length > 0
       - target_group_name | length > 0
-    fail_msg: "Please provide both 'instance_ip' and 'target_group_name'. Example:
-               ansible-playbook playbooks/add_to_tg.yml -e 'instance_ip=10.0.11.171 target_group_name=test-tg'"
+    fail_msg: >
+      Please provide both 'instance_ip' and 'target_group_name'. Example:
+      ansible-playbook playbooks/add_to_tg.yml -e 'instance_ip=10.0.11.171 target_group_name=test-tg'
 
-# Fetch Target Group ARN using TG name
+# Dry-run: Mock Target Group ARN
+- name: Mock Target Group ARN for dry-run
+  set_fact:
+    target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/test-tg/abcd1234"
+  when: ansible_check_mode
+
+# Fetch Target Group ARN using TG name (real run)
 - name: Fetch Target Group ARN from TG name
   community.aws.elb_target_group_info:
     region: "{{ region }}"
     names:
       - "{{ target_group_name }}"
   register: tg_info
+  when: not ansible_check_mode
 
 - name: Fail if target group not found
   fail:
     msg: "Target Group '{{ target_group_name }}' not found in region {{ region }}"
-  when: tg_info.target_groups | length == 0
+  when: not ansible_check_mode and tg_info.target_groups | length == 0
 
-- name: Set TG ARN fact
+- name: Set TG ARN fact (real run)
   set_fact:
     target_group_arn: "{{ tg_info.target_groups[0].target_group_arn }}"
+  when: not ansible_check_mode
 
-# Fetch EC2 instance info by private IP
+# Fetch EC2 instance info by private IP (real run)
 - name: Fetch EC2 instance ID from private IP
   community.aws.ec2_instance_info:
     region: "{{ region }}"
     filters:
       private-ip-address: "{{ instance_ip }}"
   register: ec2_info
+  when: not ansible_check_mode
 
 - name: Fail if EC2 not found
   fail:
     msg: "No instance found with IP {{ instance_ip }} in region {{ region }}"
-  when: ec2_info.instances | length == 0
+  when: not ansible_check_mode and ec2_info.instances | length == 0
 
-- name: Set instance facts
+- name: Set instance facts (real run)
   set_fact:
     instance_id: "{{ ec2_info.instances[0].instance_id }}"
     instance_state: "{{ ec2_info.instances[0].state.name }}"
+  when: not ansible_check_mode
 
-# Register if running or stopped
+# Register if running or stopped (real run)
 - name: Register instance to Target Group
-  when: instance_state in ['running', 'stopped']
   community.aws.elb_target:
     region: "{{ region }}"
     target_group_arn: "{{ target_group_arn }}"
     targets:
       - Id: "{{ instance_id }}"
     state: present
+  when: not ansible_check_mode and instance_state in ['running', 'stopped']
 
-# Deregister if terminated or shutting-down
+# Deregister if terminated or shutting-down (real run)
 - name: Deregister instance from Target Group
-  when: instance_state in ['terminated', 'shutting-down']
   community.aws.elb_target:
     region: "{{ region }}"
     target_group_arn: "{{ target_group_arn }}"
     targets:
       - Id: "{{ instance_id }}"
     state: absent
+  when: not ansible_check_mode and instance_state in ['terminated', 'shutting-down']
 
-- name: Print final action
+# Dry-run debug output
+- name: Print dry-run final action
   debug:
     msg: >
-      Instance {{ instance_id }} ({{ instance_state }})
-      {{ 'registered/kept' if instance_state in ['running','stopped'] else 'removed' }}
+      [DRY-RUN] Instance {{ instance_ip }} would be
+      {{ 'registered/kept' if instance_state is defined and instance_state in ['running','stopped'] else 'removed' }}
       in target group {{ target_group_name }}
+  when: ansible_check_mode
