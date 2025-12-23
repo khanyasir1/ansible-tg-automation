@@ -1,56 +1,128 @@
+# ---
+# # Validate inputs
+# - name: "Validate required inputs"
+#   assert:
+#     that:
+#       - instance_ip | length > 0
+#       - target_group_name | length > 0
+#     fail_msg: "Please provide both 'instance_ip' and 'target_group_name' using -e option. Example:
+#                ansible-playbook playbooks/add_to_tg.yml -e 'instance_ip=10.0.11.171 target_group_name=fe-parallel-test-int-tg-002'"
+
+# # Fetch Target Group ARN using TG Name
+# - name: "Fetch Target Group ARN from TG name"
+#   amazon.aws.elb_target_group_info:
+#     region: "{{ region }}"
+#     names:
+#       - "{{ target_group_name }}"
+#   register: tg_info
+
+# - name: "Fail if target group not found"
+#   fail:
+#     msg: "Target Group '{{ target_group_name }}' not found in region {{ region }}"
+#   when: tg_info.target_groups | length == 0
+
+# - name: "Set TG ARN fact"
+#   set_fact:
+#     target_group_arn: "{{ tg_info.target_groups[0].target_group_arn }}"
+
+# # Fetch EC2 instance info by private IP
+# - name: "Fetch EC2 instance ID from private IP"
+#   amazon.aws.ec2_instance_info:
+#     region: "{{ region }}"
+#     filters:
+#       private-ip-address: "{{ instance_ip }}"
+#   register: ec2_info
+
+# - name: "Fail if EC2 not found"
+#   fail:
+#     msg: "No instance found with IP {{ instance_ip }} in region {{ region }}"
+#   when: ec2_info.instances | length == 0
+
+# - name: "Set instance facts"
+#   set_fact:
+#     instance_id: "{{ ec2_info.instances[0].instance_id }}"
+#     instance_state: "{{ ec2_info.instances[0].state.name }}"
+
+# # - name: "Show instance details"
+# #   debug:
+# #     msg: "Found instance {{ instance_id }} with state '{{ instance_state }}'"
+
+# # Register if running or stopped
+# - name: "Register instance to Target Group"
+#   when: instance_state in ["running", "stopped"]
+#   amazon.aws.elb_target:
+#     region: "{{ region }}"
+#     target_group_arn: "{{ target_group_arn }}"
+#     targets:
+#       - Id: "{{ instance_id }}"
+#     state: present
+
+# # Deregister if terminated or shutting-down
+# - name: "Deregister instance from Target Group"
+#   when: instance_state in ["terminated", "shutting-down"]
+#   amazon.aws.elb_target:
+#     region: "{{ region }}"
+#     target_group_arn: "{{ target_group_arn }}"
+#     targets:
+#       - Id: "{{ instance_id }}"
+#     state: absent
+
+# - name: "Print final action"
+#   debug:
+#     msg: >
+#       Instance {{ instance_id }} ({{ instance_state }})
+#       {{ 'registered/kept' if instance_state in ['running','stopped'] else 'removed' }}
+#       in target group {{ target_group_name }}
+
 ---
 # Validate inputs
-- name: "Validate required inputs"
+- name: Validate required inputs
   assert:
     that:
       - instance_ip | length > 0
       - target_group_name | length > 0
-    fail_msg: "Please provide both 'instance_ip' and 'target_group_name' using -e option. Example:
-               ansible-playbook playbooks/add_to_tg.yml -e 'instance_ip=10.0.11.171 target_group_name=fe-parallel-test-int-tg-002'"
+    fail_msg: "Please provide both 'instance_ip' and 'target_group_name'. Example:
+               ansible-playbook playbooks/add_to_tg.yml -e 'instance_ip=10.0.11.171 target_group_name=test-tg'"
 
-# Fetch Target Group ARN using TG Name
-- name: "Fetch Target Group ARN from TG name"
-  amazon.aws.elb_target_group_info:
+# Fetch Target Group ARN using TG name
+- name: Fetch Target Group ARN from TG name
+  community.aws.elb_target_group_info:
     region: "{{ region }}"
     names:
       - "{{ target_group_name }}"
   register: tg_info
 
-- name: "Fail if target group not found"
+- name: Fail if target group not found
   fail:
     msg: "Target Group '{{ target_group_name }}' not found in region {{ region }}"
   when: tg_info.target_groups | length == 0
 
-- name: "Set TG ARN fact"
+- name: Set TG ARN fact
   set_fact:
     target_group_arn: "{{ tg_info.target_groups[0].target_group_arn }}"
 
 # Fetch EC2 instance info by private IP
-- name: "Fetch EC2 instance ID from private IP"
-  amazon.aws.ec2_instance_info:
+- name: Fetch EC2 instance ID from private IP
+  community.aws.ec2_instance_info:
     region: "{{ region }}"
     filters:
       private-ip-address: "{{ instance_ip }}"
   register: ec2_info
 
-- name: "Fail if EC2 not found"
+- name: Fail if EC2 not found
   fail:
     msg: "No instance found with IP {{ instance_ip }} in region {{ region }}"
   when: ec2_info.instances | length == 0
 
-- name: "Set instance facts"
+- name: Set instance facts
   set_fact:
     instance_id: "{{ ec2_info.instances[0].instance_id }}"
     instance_state: "{{ ec2_info.instances[0].state.name }}"
 
-# - name: "Show instance details"
-#   debug:
-#     msg: "Found instance {{ instance_id }} with state '{{ instance_state }}'"
-
 # Register if running or stopped
-- name: "Register instance to Target Group"
-  when: instance_state in ["running", "stopped"]
-  amazon.aws.elb_target:
+- name: Register instance to Target Group
+  when: instance_state in ['running', 'stopped']
+  community.aws.elb_target:
     region: "{{ region }}"
     target_group_arn: "{{ target_group_arn }}"
     targets:
@@ -58,16 +130,16 @@
     state: present
 
 # Deregister if terminated or shutting-down
-- name: "Deregister instance from Target Group"
-  when: instance_state in ["terminated", "shutting-down"]
-  amazon.aws.elb_target:
+- name: Deregister instance from Target Group
+  when: instance_state in ['terminated', 'shutting-down']
+  community.aws.elb_target:
     region: "{{ region }}"
     target_group_arn: "{{ target_group_arn }}"
     targets:
       - Id: "{{ instance_id }}"
     state: absent
 
-- name: "Print final action"
+- name: Print final action
   debug:
     msg: >
       Instance {{ instance_id }} ({{ instance_state }})
