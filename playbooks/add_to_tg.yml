@@ -1,0 +1,7 @@
+---
+- name: Add/Remove EC2 instance in Target Group automatically
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  roles:
+    - role: add_to_tg

@@ -1,0 +1,5 @@
+---
+galaxy_info:
+  author: yasir
+  description: Role to automatically manage EC2 Target Group registration
+ 
