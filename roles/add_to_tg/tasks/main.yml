@@ -175,7 +175,7 @@
 
 # Fetch Target Group ARN using TG Name
 - name: "Fetch Target Group ARN from TG name"
-  amazon.aws.elb_target_group:
+  community.aws.elb_target_group_info:
     region: "{{ region }}"
     names:
       - "{{ target_group_name }}"
