@@ -160,7 +160,6 @@
 #       in target group {{ target_group_name }}
 #   when: ansible_check_mode
 
-
 ---
 # Validate inputs
 - name: "Validate required inputs"
@@ -171,7 +170,7 @@
     fail_msg: >
       Please provide both 'instance_ip' and 'target_group_name' using -e option.
       Example:
-      ansible-playbook playbooks/add_to_tg.yml -e "instance_ip=10.0.11.171 target_group_name=fe-parallel-test-int-tg-002"
+      ansible-playbook playbooks/add_to_tg.yml -e "instance_ip=10.0.11.171 target_group_name=my-tg"
 
 # Fetch Target Group ARN using TG Name
 - name: "Fetch Target Group ARN from TG name"
@@ -192,7 +191,7 @@
 
 # Fetch EC2 instance info by private IP
 - name: "Fetch EC2 instance ID from private IP"
-  amazon.aws.ec2_instance_info:
+  community.aws.ec2_instance_info:
     region: "{{ region }}"
     filters:
       private-ip-address: "{{ instance_ip }}"
@@ -218,7 +217,7 @@
 # Register instance (both HTTP & HTTPS)
 - name: "Register instance to Target Group for HTTP and HTTPS"
   when: instance_state in ["running", "stopped"]
-  amazon.aws.elb_target:
+  community.aws.elb_target:
     region: "{{ region }}"
     target_group_arn: "{{ target_group_arn }}"
     targets:
@@ -231,7 +230,7 @@
 # Deregister if terminated/shutting-down
 - name: "Deregister instance from Target Group (HTTP & HTTPS)"
   when: instance_state in ["terminated", "shutting-down"]
-  amazon.aws.elb_target:
+  community.aws.elb_target:
     region: "{{ region }}"
     target_group_arn: "{{ target_group_arn }}"
     targets:
