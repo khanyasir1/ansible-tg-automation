@@ -160,6 +160,7 @@
 #       in target group {{ target_group_name }}
 #   when: ansible_check_mode
 
+
 ---
 # Validate inputs
 - name: "Validate required inputs"
@@ -214,36 +215,50 @@
       - "State: {{ instance_state }}"
       - "Target Group ARN: {{ target_group_arn }}"
 
-# Register instance (both HTTP & HTTPS)
-- name: "Register instance to Target Group for HTTP and HTTPS"
+# Register instance for HTTP
+- name: "Register instance to Target Group (HTTP 80)"
   when: instance_state in ["running", "stopped"]
   community.aws.elb_target:
     region: "{{ region }}"
     target_group_arn: "{{ target_group_arn }}"
-    targets:
-      - Id: "{{ instance_id }}"
-        Port: 80
-      - Id: "{{ instance_id }}"
-        Port: 443
+    target_id: "{{ instance_id }}"
+    port: 80
     state: present
 
-# Deregister if terminated/shutting-down
-- name: "Deregister instance from Target Group (HTTP & HTTPS)"
+# Register instance for HTTPS
+- name: "Register instance to Target Group (HTTPS 443)"
+  when: instance_state in ["running", "stopped"]
+  community.aws.elb_target:
+    region: "{{ region }}"
+    target_group_arn: "{{ target_group_arn }}"
+    target_id: "{{ instance_id }}"
+    port: 443
+    state: present
+
+# Deregister HTTP
+- name: "Deregister instance from Target Group (HTTP 80)"
   when: instance_state in ["terminated", "shutting-down"]
   community.aws.elb_target:
     region: "{{ region }}"
     target_group_arn: "{{ target_group_arn }}"
-    targets:
-      - Id: "{{ instance_id }}"
-        Port: 80
-      - Id: "{{ instance_id }}"
-        Port: 443
+    target_id: "{{ instance_id }}"
+    port: 80
     state: absent
 
-# Print final action
+# Deregister HTTPS
+- name: "Deregister instance from Target Group (HTTPS 443)"
+  when: instance_state in ["terminated", "shutting-down"]
+  community.aws.elb_target:
+    region: "{{ region }}"
+    target_group_arn: "{{ target_group_arn }}"
+    target_id: "{{ instance_id }}"
+    port: 443
+    state: absent
+
+# Final summary
 - name: "Print final action"
   debug:
     msg: >
       Instance {{ instance_id }} ({{ instance_state }})
-      {{ 'registered or kept' if instance_state in ['running','stopped'] else 'deregistered' }}
+      {{ 'registered/kept' if instance_state in ['running','stopped'] else 'deregistered' }}
       for ports 80 & 443 in Target Group {{ target_group_name }}
