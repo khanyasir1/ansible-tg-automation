@@ -214,15 +214,20 @@
       - "State: {{ instance_state }}"
       - "Target Group ARN: {{ target_group_arn }}"
 
-# --- Determine which ports to use ---
+# Determine which ports to use safely
 - name: "Set target ports based on input"
   set_fact:
     target_ports: >-
       {% if ports is defined %}
-        {% if ports == 'http' %}[80]{% elif ports == 'https' %}[443]{% else %}[80, 443]{% endif %}
+        {% if ports == 'http' %}80{% elif ports == 'https' %}443{% else %}80,443{% endif %}
       {% else %}
-        [80, 443]
+        80,443
       {% endif %}
+
+- name: "Convert target_ports to proper list of integers"
+  set_fact:
+    target_ports: "{{ target_ports | split(',') | map('int') | list }}"
+
 
 # --- Register instance dynamically ---
 - name: "Register instance to Target Group"
