@@ -160,9 +160,8 @@
 #       in target group {{ target_group_name }}
 #   when: ansible_check_mode
 
-
 ---
-# Validate inputs
+# --- Validate inputs ---
 - name: "Validate required inputs"
   assert:
     that:
@@ -173,7 +172,7 @@
       Example:
       ansible-playbook playbooks/add_to_tg.yml -e "instance_ip=10.0.11.171 target_group_name=my-tg"
 
-# Fetch Target Group ARN using TG Name
+# --- Fetch Target Group ARN ---
 - name: "Fetch Target Group ARN from TG name"
   community.aws.elb_target_group_info:
     region: "{{ region }}"
@@ -186,11 +185,11 @@
     msg: "Target Group '{{ target_group_name }}' not found in region {{ region }}"
   when: tg_info.target_groups | length == 0
 
-- name: "Set TG ARN fact"
+- name: "Set Target Group ARN fact"
   set_fact:
     target_group_arn: "{{ tg_info.target_groups[0].target_group_arn }}"
 
-# Fetch EC2 instance info by private IP
+# --- Fetch EC2 info ---
 - name: "Fetch EC2 instance ID from private IP"
   community.aws.ec2_instance_info:
     region: "{{ region }}"
@@ -203,7 +202,7 @@
     msg: "No instance found with IP {{ instance_ip }} in region {{ region }}"
   when: ec2_info.instances | length == 0
 
-- name: "Set instance facts"
+- name: "Set EC2 facts"
   set_fact:
     instance_id: "{{ ec2_info.instances[0].instance_id }}"
     instance_state: "{{ ec2_info.instances[0].state.name }}"
@@ -215,50 +214,42 @@
       - "State: {{ instance_state }}"
       - "Target Group ARN: {{ target_group_arn }}"
 
-# Register instance for HTTP
-- name: "Register instance to Target Group (HTTP 80)"
+# --- Determine which ports to use ---
+- name: "Set target ports based on input"
+  set_fact:
+    target_ports: >-
+      {% if ports is defined %}
+        {% if ports == 'http' %}[80]{% elif ports == 'https' %}[443]{% else %}[80, 443]{% endif %}
+      {% else %}
+        [80, 443]
+      {% endif %}
+
+# --- Register instance dynamically ---
+- name: "Register instance to Target Group"
   when: instance_state in ["running", "stopped"]
   community.aws.elb_target:
     region: "{{ region }}"
     target_group_arn: "{{ target_group_arn }}"
     target_id: "{{ instance_id }}"
-    target_port: 80
+    target_port: "{{ item }}"
     state: present
+  loop: "{{ target_ports }}"
 
-# Register instance for HTTPS
-- name: "Register instance to Target Group (HTTPS 443)"
-  when: instance_state in ["running", "stopped"]
-  community.aws.elb_target:
-    region: "{{ region }}"
-    target_group_arn: "{{ target_group_arn }}"
-    target_id: "{{ instance_id }}"
-    target_port: 443
-    state: present
-
-# Deregister HTTP
-- name: "Deregister instance from Target Group (HTTP 80)"
+# --- Deregister instance dynamically ---
+- name: "Deregister instance from Target Group"
   when: instance_state in ["terminated", "shutting-down"]
   community.aws.elb_target:
     region: "{{ region }}"
     target_group_arn: "{{ target_group_arn }}"
     target_id: "{{ instance_id }}"
-    target_port: 80
+    target_port: "{{ item }}"
     state: absent
+  loop: "{{ target_ports }}"
 
-# Deregister HTTPS
-- name: "Deregister instance from Target Group (HTTPS 443)"
-  when: instance_state in ["terminated", "shutting-down"]
-  community.aws.elb_target:
-    region: "{{ region }}"
-    target_group_arn: "{{ target_group_arn }}"
-    target_id: "{{ instance_id }}"
-    target_port: 443
-    state: absent
-
-# Final summary
+# --- Final summary ---
 - name: "Print final action"
   debug:
     msg: >
       Instance {{ instance_id }} ({{ instance_state }})
       {{ 'registered/kept' if instance_state in ['running','stopped'] else 'deregistered' }}
-      for ports 80 & 443 in Target Group {{ target_group_name }}
+      for ports {{ target_ports | join(', ') }} in Target Group {{ target_group_name }}
