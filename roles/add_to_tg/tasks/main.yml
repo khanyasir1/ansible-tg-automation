@@ -232,7 +232,7 @@
         {% elif p == 'https' %}443
         {% else %}{{ ports }}{% endif %}
       {% else %}
-        80,443
+        80
       {% endif %}
 
 - name: "Convert target_ports to proper list of integers"
