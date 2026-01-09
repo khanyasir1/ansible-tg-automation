@@ -225,7 +225,7 @@
 #       {% endif %}
 - name: "Set target ports based on input"
   set_fact:
-    target_ports_raw: >-
+    target_ports: >-
       {% if ports is defined %}
         {% set p = ports | lower %}
         {% if p == 'http' %}80
