@@ -215,11 +215,22 @@
       - "Target Group ARN: {{ target_group_arn }}"
 
 # Determine which ports to use safely
+# - name: "Set target ports based on input"
+#   set_fact:
+#     target_ports: >-
+#       {% if ports is defined %}
+#         {% if ports == 'http' %}80{% elif ports == 'https' %}443{% else %}80,443{% endif %}
+#       {% else %}
+#         80,443
+#       {% endif %}
 - name: "Set target ports based on input"
   set_fact:
-    target_ports: >-
+    target_ports_raw: >-
       {% if ports is defined %}
-        {% if ports == 'http' %}80{% elif ports == 'https' %}443{% else %}80,443{% endif %}
+        {% set p = ports | lower %}
+        {% if p == 'http' %}80
+        {% elif p == 'https' %}443
+        {% else %}{{ ports }}{% endif %}
       {% else %}
         80,443
       {% endif %}
